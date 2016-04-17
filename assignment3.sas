@@ -1,3 +1,4 @@
+* source code for assignment #3 in predictive analytics 410;
 libname mydata 'c:\mspa\410' access=readonly;
 
 ods graphic on;
@@ -7,13 +8,17 @@ title 'Assignment 3';
 * create a local copy of the data, add additional variables for future work ;
 data temp;
   set mydata.ames_housing_data;
-  logSalePrice = log(SalePrice);
-  AgeAtSale = YrSold - YearBuilt;
   PriceSqft = SalePrice / GrLivArea;
   if (AgeAtSale = 0) then 
     NewBldg = 'Yes';
   else 
     NewBldg = 'No';
+run; quit;
+
+* scatter plot of living area to sales price;
+proc sgscatter data=temp;
+    compare x=GrLivArea y=saleprice / loess reg;
+	title 'Scatter Plot of Sale Price by Living Area';
 run; quit;
 
 * compare sale price of new construction versus rest using boxplot;
@@ -46,9 +51,16 @@ proc freq data = drop;
  title 'Sample Waterfall';
 run; quit;
 
+* create a data set of remaining observations with additional variables;
 data keep;
   set drop
   (where = (drop_condition = '08: Sample Population'));
+  logSalePrice    = log(SalePrice);
+  logGrLivArea    = log(GrLivArea);
+  logLotArea      = log(LotArea);
+  logTotalBsmtSF  = log(TotalBsmtSF);
+  AgeAtSale = YrSold - YearBuilt;
+  logAgeAtSale = log(AgeAtSale); 
 run; quit;
 
 * produce a scatter plot of candidate continous variables and pearson correlation values;
@@ -158,13 +170,13 @@ proc freq data = outlier2;
   title 'Sample Waterfall for Outlier Detection';
 run; quit;
 
-proc sgscatter data=outlier2;
-   plot SalePrice*GrLivArea / group=outlier_def transparency=0.5;
+proc sgscatter data=outlier2 datasymbols=(CircleFilled);
+   plot SalePrice*GrLivArea / group=outlier_def transparency=0.5 markerattrs=(size=8);
    title 'Scatter Plot of Sale Price to Living Area by Outlier Code';
 run;
 
-proc sgscatter data=outlier2;
-   plot SalePrice*AgeAtSale / group=outlier_def transparency=0.5;
+proc sgscatter data=outlier2 datasymbols=(CircleFilled);
+   plot SalePrice*AgeAtSale / group=outlier_def transparency=0.5 markerattrs=(size=8);
    title 'Scatter Plot of Sale Price to Age by Outlier Code';
 run;
 
@@ -185,11 +197,21 @@ proc reg data = sans_outlier plots =  diagnostics(unpack);
   title 'Outlier Removed: Sale Price by Living Area and Bulding Age';
 run; quit;
 
-* comparing SalePrice to log(SalePrice) ;
-
+* comparing SalePrice to log(SalePrice) and keeping only building with age over 15 years ;
 * model 5;
 proc reg data = keep plots =  diagnostics(unpack);
   model logSalePrice = GrLivArea AgeAtSale;
   title 'Log Sale Price by Living Area and Bulding Age';
 run; quit;
 
+* model 6;
+proc reg data = keep plots =  diagnostics(unpack);
+  model logSalePrice = GrLivArea LotArea / vif;
+  title 'Log Sale Price by Living Area and Lot Area';
+run; quit;
+
+* model 7;
+proc reg data = keep plots =  diagnostics(unpack);
+  model logSalePrice = logGrLivArea logLotArea  / vif;
+  title 'Log Sale Price by Log Living Area and Log Lot Area';
+run; quit;
