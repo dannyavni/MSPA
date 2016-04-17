@@ -204,14 +204,56 @@ proc reg data = keep plots =  diagnostics(unpack);
   title 'Log Sale Price by Living Area and Bulding Age';
 run; quit;
 
+* introduce indicators variables ;
+data ind;
+	set keep;
+
+    total_baths = max(FullBath,0) + max(BsmtFullBath,0);
+	total_halfbaths = max(HalfBath,0) + max(BsmtHalfBath,0);
+	total_baths_calc = total_baths + total_halfbaths;
+
+    if (Neighborhood in ('StoneBr','NridgHt','Greens','GrnHill')) 
+      then hood_ind = 2; 
+    else if (Neighborhood in ('BrDale','IDOTRR','MeadowV','OldTown','SWISU')) 
+      then hood_ind = 1;
+	else
+	  hood_ind = 1;
+	if (SaleCondition = 'Normal') then normal_sale=1; else normal_sale=0;
+	if (CentralAir='Y') then central_air=1; else central_air=0;
+	if (Fireplaces>0) then fireplace_ind=1; else fireplace_ind=0;
+	if (GarageCars>0) then garage_ind=1; else garage_ind=0;
+	if (BsmtQual in ('Ex','Gd')) or (BsmtCond in ('Ex','Gd')) then good_basement_ind=1; else good_basement_ind=0;
+	if (ExterQual='Ex') then ExterQual_Ex=1; else ExterQual_Ex=0;
+	if (ExterQual='Gd') then ExterQual_Gd=1; else ExterQual_Gd=0;
+	if (ExterQual='TA') then ExterQual_TA=1; else ExterQual_TA=0;
+	if (ExterQual='Fa') then ExterQual_Fa=1; else ExterQual_Fa=0;
+	if (ExterQual='Po') then ExterQual_Po=1; else ExterQual_Po=0;
+	if (Exterior1 in ('BrkComm','BrkFace')) or (Exterior2 in ('BrkComm','BrkFace')) 
+	  then brick_exterior=1; else brick_exterior=0;
+	if (LotShape in ('Reg','IR1')) then regular_lot=1; else regular_lot=0;
+	if (LotConfig='Inside') then lot_inside=1; else lot_inside=0;
+	if (LotConfig='Corner') then lot_corner=1; else lot_corner=0;
+	if (LotConfig='CulDSac') then lot_culdsac=1; else lot_culdsac=0;
+	if (LotConfig in ('FR2','FR3')) then lot_frontage=1; else lot_frontage=0;
+	quality_index = OverallCond*OverallQual;
+run; quit;
+
 * model 6;
-proc reg data = keep plots =  diagnostics(unpack);
-  model logSalePrice = GrLivArea LotArea / vif;
-  title 'Log Sale Price by Living Area and Lot Area';
+proc reg data = ind plots =  diagnostics(unpack);
+  model logSalePrice = GrLivArea LotArea AgeAtSale
+    total_baths_calc TotRmsAbvGrd hood_ind 
+	central_air fireplace_ind garage_ind good_basement_ind
+	quality_index  brick_exterior lot_frontage
+  / vif;
+  title 'Log Sale Price with Original Living Area and Lot Area';
 run; quit;
 
 * model 7;
-proc reg data = keep plots =  diagnostics(unpack);
-  model logSalePrice = logGrLivArea logLotArea  / vif;
-  title 'Log Sale Price by Log Living Area and Log Lot Area';
+proc reg data = ind plots =  diagnostics(unpack);
+  model logSalePrice = logGrLivArea logLotArea AgeAtSale
+    total_baths_calc TotRmsAbvGrd hood_ind 
+	central_air fireplace_ind garage_ind good_basement_ind
+	quality_index  brick_exterior lot_frontage
+  / vif;
+  title 'Log Sale Price by Log Transformed Living Area and Lot Area';
 run; quit;
