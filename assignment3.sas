@@ -58,9 +58,7 @@ data keep;
   logSalePrice    = log(SalePrice);
   logGrLivArea    = log(GrLivArea);
   logLotArea      = log(LotArea);
-  logTotalBsmtSF  = log(TotalBsmtSF);
   AgeAtSale = YrSold - YearBuilt;
-  logAgeAtSale = log(AgeAtSale); 
 run; quit;
 
 * produce a scatter plot of candidate continous variables and pearson correlation values;
@@ -105,38 +103,39 @@ proc reg data = keep plots =  diagnostics(unpack);
   title 'Sale Price by Living Area and Bulding Age';
 run; quit;
 
-* outlier section - 2213 observations;
+* outlier section - 2315 observations;
 data outlier1;
   set outlier;
   absr = abs(r);
   absd = abs(dfitt);
+  rprodlev = absr * lev;
 run; quit; 
 
 proc sort data=outlier1;
   by lev;
 run; quit;
 
-proc print data=outlier1 (firstobs=2188);
+proc print data=outlier1 (firstobs=2306);
   var lev r dfitt GrLivArea AgeAtSale SalePrice;
-  title 'Top 25 Leverage Points for GrLivArea and AgeAtSale';
+  title 'Top 10 Leverage Points for GrLivArea and AgeAtSale';
 run; quit;
 
 proc sort data=outlier1;
-  by absr;
+  by rprodlev;
 run; quit;
 
-proc print data=outlier1 (firstobs=2188);
+proc print data=outlier1 (firstobs=2306);
   var r lev dfitt GrLivArea AgeAtSale SalePrice;
-  title 'Top 25 Abs(R) Points for GrLivArea and AgeAtSale';
+  title 'Top 10 Abs(R) Points for GrLivArea and AgeAtSale';
 run; quit;
 
 proc sort data=outlier1;
-  by absd;
+  by absr*lev;
 run; quit;
 
-proc print data=outlier1 (firstobs=2188);
+proc print data=outlier1 (firstobs=2306);
   var dfitt lev r GrLivArea AgeAtSale SalePrice;
-  title 'Top Abs(DFITTS) Points for GrLivArea';
+  title 'Top 10 Abs(R)*Leverage Points for GrLivArea';
 run; quit;
 
 * produce water fall of outlier drop off criteria ;
@@ -212,12 +211,14 @@ data ind;
 	total_halfbaths = max(HalfBath,0) + max(BsmtHalfBath,0);
 	total_baths_calc = total_baths + total_halfbaths;
 
-    if (Neighborhood in ('StoneBr','NridgHt','Greens','GrnHill')) 
-      then hood_ind = 2; 
-    else if (Neighborhood in ('BrDale','IDOTRR','MeadowV','OldTown','SWISU')) 
-      then hood_ind = 1;
+    if (Neighborhood in ('StoneBr','NridgHt','Greens','GrnHill')) then 
+      highend_ind = 1;
+    else
+      highend_ind = 0; 
+    if (Neighborhood in ('BrDale','IDOTRR','MeadowV','OldTown','SWISU')) then 
+      midend_ind = 0;
 	else
-	  hood_ind = 1;
+	  midend_ind = 1;
 	if (SaleCondition = 'Normal') then normal_sale=1; else normal_sale=0;
 	if (CentralAir='Y') then central_air=1; else central_air=0;
 	if (Fireplaces>0) then fireplace_ind=1; else fireplace_ind=0;
@@ -241,7 +242,7 @@ run; quit;
 * model 6;
 proc reg data = ind plots =  diagnostics(unpack);
   model logSalePrice = GrLivArea LotArea AgeAtSale
-    total_baths_calc TotRmsAbvGrd hood_ind 
+    total_baths_calc TotRmsAbvGrd highend_ind midend_ind 
 	central_air fireplace_ind garage_ind good_basement_ind
 	quality_index  brick_exterior lot_frontage
   / vif;
@@ -251,9 +252,25 @@ run; quit;
 * model 7;
 proc reg data = ind plots =  diagnostics(unpack);
   model logSalePrice = logGrLivArea logLotArea AgeAtSale
-    total_baths_calc TotRmsAbvGrd hood_ind 
+    total_baths_calc TotRmsAbvGrd highend_ind midend_ind 
 	central_air fireplace_ind garage_ind good_basement_ind
 	quality_index  brick_exterior lot_frontage
   / vif;
   title 'Log Sale Price by Log Transformed Living Area and Lot Area';
+run; quit;
+
+* additional misc plots for appendix;
+proc sgplot data=keep;
+title 'Sale Price by LotConfig';
+vbox SalePrice / category=LotConfig;
+run; quit;
+
+proc sgplot data=ind;
+title 'Sale Price by High End Ind';
+vbox SalePrice / category=highend_ind;
+run; quit;
+
+proc sgplot data=ind;
+title 'Sale Price by Mid End Ind';
+vbox SalePrice / category=midend_ind;
 run; quit;
